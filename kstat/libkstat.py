@@ -8,7 +8,7 @@
 #
 #
 # Copyright 2011 Grigale Ltd. All rigths reserved.
-# Use is sujbect to license terms.
+# Use is subject to license terms.
 #
 import ctypes as C
 
@@ -26,37 +26,35 @@ kstat_type_names = {
 
 KSTAT_STRLEN = 31
 
-hrtime_t = C.c_longlong
+#class hrtime_t(C._SimpleCData):
+class hrtime_t(C.c_longlong):
+  #_type_ = C.c_longlong._type_
+
+  def __long__(self):
+      return super(hrtime_t,self).value
+
+  def __str__(self):
+      value = str(super(hrtime_t,self).value)
+      if len(value)>9:
+        value = (value[:-9]+'.'+value[-9:]).rstrip('0').rstrip('.')
+      return value
+
 kid_t = C.c_int
+kid64_t = C.c_int64
 kstat_string = C.c_char * KSTAT_STRLEN
+
+data_union_fields = [
+    ('raw', C.c_void_p),
+    ('named', C.c_void_p),
+    ('intr', C.c_void_p),
+    ('io', C.c_void_p),
+    ('timer', C.c_void_p),
+]
 
 class kstat(C.Structure):
     pass
 
 kstat_p = C.POINTER(kstat)
-
-kstat._fields_ = [
-    ('ks_crtime', hrtime_t),
-    ('ks_next', kstat_p),
-    ('ks_kid', kid_t),
-    ('ks_module', kstat_string),
-    ('ks_resv', C.c_ubyte),
-    ('ks_instance', C.c_int),
-    ('ks_name', kstat_string),
-    ('ks_type', C.c_ubyte),
-    ('ks_class', kstat_string),
-    ('ks_flags', C.c_ubyte),
-    ('ks_data', C.c_void_p),
-    ('ks_ndata', C.c_uint),
-    ('ks_data_size', C.c_size_t),
-    ('ks_snaptime', hrtime_t),
-
-    ('ks_update', C.c_void_p),
-    ('ks_private', C.c_void_p),
-    ('ks_snapshot', C.c_void_p),
-    ('ks_lock', C.c_void_p)
-]
-
 
 #/*
 # * kstat_open() returns a pointer to a kstat_ctl_t.
@@ -125,7 +123,7 @@ KSTAT_DATA_STRING = 9
 
 class addr_union(C.Union):
     _fields_ = [
-        ('ptr', C.c_char_p),
+        ('ptr', C.c_void_p),
         ('__pad', C.c_char * 8),
     ]
 
@@ -144,6 +142,7 @@ class value_union(C.Union):
 	('ui32', C.c_uint32),
 	('i64', C.c_int64),
 	('ui64', C.c_uint64),
+	('str', str_struct),
     ]
 
 
@@ -153,7 +152,79 @@ class kstat_named(C.Structure):
         ('data_type', C.c_ubyte),
         ('value', value_union),
     ]
+data_union_fields[KSTAT_TYPE_NAMED] = ('named',C.POINTER(kstat_named))
 
+
+KSTAT_INTR_HARD     = 0
+KSTAT_INTR_SOFT     = 1
+KSTAT_INTR_WATCHDOG = 2
+KSTAT_INTR_SPURIOUS = 3
+KSTAT_INTR_MULTSVC  = 4
+KSTAT_NUM_INTRS     = 5
+class kstat_intr(C.Structure):
+    _fields_ = [
+        ('intrs', C.c_uint*KSTAT_NUM_INTRS),
+    ]
+data_union_fields[KSTAT_TYPE_INTR] = ('intr',C.POINTER(kstat_intr))
+
+
+class kstat_io(C.Structure):
+    _fields_ = [
+        ('nread', C.c_ulonglong),
+        ('nwritten', C.c_ulonglong),
+        ('reads', C.c_uint),
+        ('writes', C.c_uint),
+        ('wtime', hrtime_t),
+        ('wlentime', hrtime_t),
+        ('wlastupdate', hrtime_t),
+        ('rtime', hrtime_t),
+        ('rlentime', hrtime_t),
+        ('rlastupdate', hrtime_t),
+        ('wcnt', C.c_uint),
+        ('rcnt', C.c_uint),
+    ]
+data_union_fields[KSTAT_TYPE_IO] = ('io',C.POINTER(kstat_io))
+
+
+class kstat_timer(C.Structure):
+    _fields_ = [
+        ('name', kstat_string),
+        ('resv', C.c_ubyte),
+        ('num_events', C.c_ulonglong),
+        ('elapsed_time', hrtime_t),
+        ('min_time', hrtime_t),
+        ('max_time', hrtime_t),
+        ('start_time', hrtime_t),
+        ('stop_time', hrtime_t),
+    ]
+data_union_fields[KSTAT_TYPE_TIMER] = ('timer',C.POINTER(kstat_timer))
+
+
+class data_union(C.Union):
+    _fields_ = data_union_fields
+del data_union_fields
+
+kstat._fields_ = [
+    ('ks_crtime', hrtime_t),
+    ('ks_next', kstat_p),
+    ('ks_kid', kid_t),
+    ('ks_module', kstat_string),
+    ('ks_resv', C.c_ubyte),
+    ('ks_instance', C.c_int),
+    ('ks_name', kstat_string),
+    ('ks_type', C.c_ubyte),
+    ('ks_class', kstat_string),
+    ('ks_flags', C.c_ubyte),
+    ('ks_data', data_union),
+    ('ks_ndata', C.c_uint),
+    ('ks_data_size', C.c_size_t),
+    ('ks_snaptime', hrtime_t),
+
+    ('ks_update', C.c_void_p),
+    ('ks_private', C.c_void_p),
+    ('ks_snapshot', C.c_void_p),
+    ('ks_lock', C.c_void_p)
+]
 
 _libkstat = C.CDLL('libkstat.so.1')
 

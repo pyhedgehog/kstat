@@ -9,11 +9,12 @@
 #
 #
 # Copyright 2011 Grigale Ltd. All rigths reserved.
-# Use is sujbect to license terms.
+# Use is subject to license terms.
 #
 
-__version__ = '1'
+__version__ = '2'
 __author__ = 'Cyril Plisko <cyril.plisko@grigale.com>'
+__patch__ = 'Michael Dubner <pywebmail@list.ru>'
 
 from .kstat import Kstat
 
